@@ -11,7 +11,7 @@ const db = PgMem.newDb();
 let database = null;
 const collectionName = "measurements";
 
-startDatabase = async () => {
+const startDatabase = async () => {
     try {
         const uri = "mongodb://localhost:27017/?maxPoolSize=20&w=majority";	
         const connection = await MongoClient.connect(uri, {useNewUrlParser: true});
@@ -20,7 +20,7 @@ startDatabase = async () => {
     catch { throw new Error('Error starting mongo database')}
 }
 
-getDatabase = async () => {
+const getDatabase = async () => {
     try {
         if (!database) await startDatabase();
         return database;
@@ -30,7 +30,7 @@ getDatabase = async () => {
     }
 }
 
-insertMeasurement = async (message) => {
+const insertMeasurement = async (message) => {
     try {
         const {insertedId} = await database.collection(collectionName).insertOne(message);
         return insertedId;
@@ -40,7 +40,7 @@ insertMeasurement = async (message) => {
     }
 }
 
-getMeasurements = async() => {
+const getMeasurements = async() => {
     try {
         const measurements = await database.collection(collectionName).find({}).toArray();
         return measurements
@@ -63,10 +63,26 @@ const PORT = 8080;
 app.post('/measurement', async (req, res) => {
 -       console.log("device id    : " + req.body.id + " key         : " + req.body.key + " temperature : " + req.body.t + " humidity    : " + req.body.h);	
     try {
+        // Check if the required fields exist and are not null or undefined.
+        if (!message || !message.id || !message.t  || !message.h) {
+            throw new Error("Invalid message format: Missing fields");
+        }
+
+        // Check if 't' is a valid temperature in Celsius.
+        if (typeof message.t !== "number" || message.t < -273|| message.t > 100) {
+            throw new Error("Invalid temperature value");
+        }
+
+        // Check if 'h' is a valid humidity value .
+        if (typeof message.h !== "number" || message.h < 0 || message.h > 100) {
+            throw new Error("Invalid humidity value");
+        }
+        //If everything checks out, then insert the measurment
         const {insertedId} = insertMeasurement({id:req.body.id, t:req.body.t, h:req.body.h});
         res.send("received measurement into " +  insertedId);
     }
     catch (err) {
+        //Catch mesurment insertion error
         console.log(err)
     }
 });
