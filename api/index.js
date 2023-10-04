@@ -61,47 +61,108 @@ app.use(express.static('spa/static'));
 const PORT = 8080;
 
 app.post('/measurement', async (req, res) => {
--       console.log("device id    : " + req.body.id + " key         : " + req.body.key + " temperature : " + req.body.t + " humidity    : " + req.body.h);	
+    console.log("device id: " + req.body.id + " temperature: " + req.body.t + " humidity: " + req.body.h);
     try {
         // Check if the required fields exist and are not null or undefined.
-        if (!message || !message.id || !message.t  || !message.h) {
-            throw new Error("Invalid message format: Missing fields");
+        if (!req.body || !req.body.id || !req.body.t || !req.body.h) {
+            console.log('missing fields')
+            res.status(400).send("Invalid message format: Missing fields");
+            return;
         }
+
+        //Check if device exists:
+        const findId = db.public.query(`SELECT * FROM devices WHERE device_id = '${req.body.id}'`)
+
+        if (findId.rows.length === 0){
+            console.log('Device not found')
+            res.status(404).send("Device id not found");
+            return;
+        }
+
+        // Parse 't' and 'h' to numbers
+        const temperature = parseFloat(req.body.t);
+        const humidity = parseFloat(req.body.h);
 
         // Check if 't' is a valid temperature in Celsius.
-        if (typeof message.t !== "number" || message.t < -273|| message.t > 100) {
-            throw new Error("Invalid temperature value");
+        if (isNaN(temperature) || req.body.t < -273 || req.body.t > 100) {
+            res.status(400).send("Invalid temperature value");
+            return;
         }
 
-        // Check if 'h' is a valid humidity value .
-        if (typeof message.h !== "number" || message.h < 0 || message.h > 100) {
-            throw new Error("Invalid humidity value");
+        // Check if 'h' is a valid humidity value.
+        if (isNaN(humidity) || req.body.h < 0 || req.body.h > 100) {
+            console.log('Invalid humidity')
+            res.status(400).send("Invalid humidity value");
+            return;
         }
-        //If everything checks out, then insert the measurment
-        const {insertedId} = insertMeasurement({id:req.body.id, t:req.body.t, h:req.body.h});
-        res.send("received measurement into " +  insertedId);
-    }
-    catch (err) {
-        //Catch mesurment insertion error
-        console.log(err)
+
+        // If everything checks out, then insert the measurement
+        const { insertedId } = insertMeasurement({ id: req.body.id, t: req.body.t, h: req.body.h });
+        res.status(200).send("Received measurement into " + insertedId);
+    } catch (err) {
+        // Catch measurement insertion error
+        console.log(err);
+        res.status(500).send("Internal Server Error");
     }
 });
 
+
 app.post('/device', async (req, res) => {
-	console.log("device id    : " + req.body.id + " name        : " + req.body.n + " key         : " + req.body.k );
+	console.log("device id: " + req.body.id + " name: " + req.body.n + " key: " + req.body.k );
     try {
+
+        if (!req.body || !req.body.id || !req.body.n || !req.body.k) {
+            console.log('missing fields')
+            res.status(400).send("Invalid message format: Missing fields");
+            return;
+        }
+
+        //Convert to number
+        const id = parseInt(req.body.id);
+        const key = parseInt(req.body.k);
+
+        //Check if id is valid
+        if(isNaN(id) || id < 0) {
+            console.log('Invalid ID')
+            res.status(400).send('Invalid ID')
+            return
+        }
+
+        //check if device exists
+        const findId = db.public.query(`SELECT * FROM devices WHERE device_id = '${req.body.id}'`)
+
+        if (findId.rows.length !== 0){
+            console.log('Device already in DB')
+            res.status(409).send("Device already in DB");
+            return;
+        }
+
+        // Check if 'n' is a valid name (limit to 20 char).
+        if (req.body.n.length > 20) {
+            console.log('Invalid Name')
+            res.status(400).send("Name must be less than 20 char");
+            return;
+        }
+
+        // Check if 'k' is a valid key (must be of 6 digit number).
+        if (isNaN(key) || key < 100000 || key > 999999) {
+            res.status(400).send("Invalid key value");
+            return;
+        }
+
         db.public.none("INSERT INTO devices VALUES ('"+req.body.id+ "', '"+req.body.n+"', '"+req.body.k+"')");
         res.send("received new device");
     }
     catch (err) {
         console.log(err)
+        res.status(500).send("Internal Server Error");
     }
 });
 
 
 app.get('/web/device',  async (req, res) => {
     try {
-        var devices = db.public.many("SELECT * FROM devices").map( function(device) {
+        var devices = db.public.many("SELECT * FROM devices").map( (device) => {
             console.log(device);
             return '<tr><td><a href=/web/device/'+ device.device_id +'>' + device.device_id + "</a>" +
                        "</td><td>"+ device.name+"</td><td>"+ device.key+"</td></tr>";
