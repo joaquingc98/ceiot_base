@@ -60,22 +60,44 @@ app.use(express.static('spa/static'));
 
 const PORT = 8080;
 
-app.post('/measurement', async (req, res) => {
+// Define a middleware to check if the device exists
+const checkDevice = async (req, res, next) => {
+    try {
+      // Check if the required fields exist and are not null or undefined.
+      if (!req.body || !req.body.id || !req.body.key) {
+        console.log('Missing fields');
+        return res.status(400).send("Invalid message format: Missing fields");
+      }
+  
+      // Check if device exists:
+      const findDevice = db.public.query(`SELECT * FROM devices WHERE device_id = '${req.body.id}'`);
+  
+      if (findDevice.rows.length === 0) {
+        console.log('Device not found');
+        return res.status(403).send("Unauthorized");
+      }
+
+      if(findDevice.rows[0].key !== req.body.key){
+        console.log('Key does not match');
+        return res.status(403).send("Unauthorized");
+      }
+  
+      // Device exists, continue to the next route handler
+      next();
+    } catch (err) {
+      console.error(err);
+      res.status(500).send("Internal Server Error");
+    }
+  };
+  
+
+app.post('/measurement', checkDevice ,async (req, res) => {
     console.log("device id: " + req.body.id + " temperature: " + req.body.t + " humidity: " + req.body.h);
     try {
         // Check if the required fields exist and are not null or undefined.
-        if (!req.body || !req.body.id || !req.body.t || !req.body.h) {
+        if (!req.body.t || !req.body.h) {
             console.log('missing fields')
             res.status(400).send("Invalid message format: Missing fields");
-            return;
-        }
-
-        //Check if device exists:
-        const findId = db.public.query(`SELECT * FROM devices WHERE device_id = '${req.body.id}'`)
-
-        if (findId.rows.length === 0){
-            console.log('Device not found')
-            res.status(404).send("Device id not found");
             return;
         }
 
