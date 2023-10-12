@@ -102,24 +102,23 @@ app.post('/measurement', checkDevice ,async (req, res) => {
         }
 
         // Parse 't' and 'h' to numbers
-        const temperature = parseFloat(req.body.t);
-        const humidity = parseFloat(req.body.h);
+        let temperature = parseFloat(req.body.t);
+        let humidity = parseFloat(req.body.h);
 
         // Check if 't' is a valid temperature in Celsius.
-        if (isNaN(temperature) || req.body.t < -273 || req.body.t > 100) {
-            res.status(400).send("Invalid temperature value");
-            return;
+        if (isNaN(temperature) || temperature < -273 || temperature > 100) {
+            temperature = "error";
+            console.log('Invalid temperature')
         }
 
         // Check if 'h' is a valid humidity value.
-        if (isNaN(humidity) || req.body.h < 0 || req.body.h > 100) {
+        if (isNaN(humidity) || humidity < 0 || humidity > 100) {
+            humidity = "error";
             console.log('Invalid humidity')
-            res.status(400).send("Invalid humidity value");
-            return;
         }
 
         // If everything checks out, then insert the measurement
-        const { insertedId } = insertMeasurement({ id: req.body.id, t: req.body.t, h: req.body.h });
+        const { insertedId } = insertMeasurement({ id: req.body.id, t: temperature, h: humidity });
         res.status(200).send("Received measurement into " + insertedId);
     } catch (err) {
         // Catch measurement insertion error
